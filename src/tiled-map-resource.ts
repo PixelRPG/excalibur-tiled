@@ -17,14 +17,14 @@ import {
    BaseAlign,
    Flags,
    Shape,
-   TransformComponent,
    ImageSource,
    Font
 } from 'excalibur';
 import { ExcaliburData, RawTiledMap, RawTiledTileset } from './tiled-types';
 import { TiledMap } from './tiled-map';
 import { parseExternalTsx } from './tiled-tileset';
-import { getCanonicalGid, isFlippedDiagonally, isFlippedHorizontally, isFlippedVertically, getPosition } from './tiled-layer';
+import { getCanonicalGid, isFlippedDiagonally, isFlippedHorizontally, isFlippedVertically } from './tiled-layer';
+import { getProperty } from './tiled-entity';
 
 export enum TiledMapFormat {
 
@@ -47,14 +47,14 @@ export class TiledMapResource implements Loadable<TiledMap> {
    public ex: ExcaliburData;
    public imageMap: Record<string, ImageSource>;
    public sheetMap: Record<string, SpriteSheet>;
-   public map?: TileMap;
+   public layers?: TileMap[] = [];
 
    /**
     * Given an origin file path, converts a file relative to that origin to a full path accessible from excalibur
     */
    public convertPath: (originPath: string, relativePath: string) => string;
 
-   constructor(public path: string, mapFormatOverride?: TiledMapFormat) {
+   constructor(public path: string, mapFormatOverride?: TiledMapFormat, private readonly layerZIndexStart = -1) {
       const detectedType = mapFormatOverride ?? (path.includes('.tmx') ? TiledMapFormat.TMX : TiledMapFormat.JSON); 
       switch (detectedType) {
          case TiledMapFormat.TMX:
@@ -153,7 +153,7 @@ export class TiledMapResource implements Loadable<TiledMap> {
     * Add tile objects as actors with additional capabilities like zIndex and collisionType
     * @param scene
     */
-   private _addTiledInsertedTilesAsActors(scene: Scene) {
+   private _addTiledInsertedTiles(scene: Scene) {
       const excalibur = this.data?.getExcaliburObjects();
       if (excalibur.length > 0) {
          const inserted = excalibur.flatMap(o => o.getInsertedTiles());
@@ -191,54 +191,17 @@ export class TiledMapResource implements Loadable<TiledMap> {
    }
 
    /**
-    * Add tiles with zindex properties as actors for additional capabilities like zIndex and collisionType
-    * @param scene
-    */
-   private _addLayerTilesAsActors(scene: Scene) {
-      for (const layer of this.data.layers) {
-         const z = layer.getProperty<number>('zindex')?.value;
-         const collisionTypeProp = layer.getProperty<CollisionType>('collisionType')?.value;
-         if (typeof z !== 'number' && !collisionTypeProp) {
-            continue;
-         }
-
-         for (var i = 0; i < layer.data.length; i++) {
-            let gid = <number>layer.data[i];
-            if (gid) {
-               const pos = getPosition(layer, i);
-               const sprite = this.getSpriteForGid(gid);
-               const actor = new Actor({
-                  x: pos.x * this.data.rawMap.tilewidth,
-                  y: pos.y * this.data.rawMap.tileheight,
-                  z,
-                  width: this.data.rawMap.tilewidth,
-                  height: this.data.rawMap.tileheight,
-                  anchor: vec(0, 1),
-                  collisionType: collisionTypeProp || CollisionType.PreventCollision,
-               });
-               if (Flags.isEnabled('use-legacy-drawing')) {
-                  actor.addDrawing(Sprite.toLegacySprite(sprite));
-               } else {
-                  actor.graphics.anchor = vec(0, 1);
-                  actor.graphics.use(sprite);
-               }
-               scene.add(actor);
-            }
-         }
-      }
-
-   }
-
-   /**
     * Use any layers with the custom property "solid"= true, to mark the TileMap
     * cells solid.
     */
    public useSolidLayers() {
-      const tm = this.getTileMap();
+      const tms = this.getTileMapLayers();
       const solidLayers = this.data?.getTileLayersByProperty('solid', true) ?? [];
       for (const solid of solidLayers) {
-         for(let i = 0; i < solid.data.length; i++) {
-            tm.data[i].solid ||= !!solid.data[i];
+         for (const tm of tms) {
+            for(let i = 0; i < solid.data.length; i++) {
+               tm.data[i].solid ||= !!solid.data[i];
+            }
          }
       }
    }
@@ -248,17 +211,16 @@ export class TiledMapResource implements Loadable<TiledMap> {
     * @param scene 
     */
    public addTiledMapToScene(scene: Scene) {
-      const tm = this.getTileMap();
-      const tx = tm.get(TransformComponent);
-      tx!.z = -1;
-      scene.add(tm);
+      const tms = this.getTileMapLayers();
+      for (const tm of tms) {
+         scene.add(tm);
+      }
       
       this._parseExcaliburInfo();
       this._addTiledCamera(scene);
       this._addTiledColliders(scene);
       this._addTiledText(scene);
-      this._addTiledInsertedTilesAsActors(scene);
-      this._addLayerTilesAsActors(scene);
+      this._addTiledInsertedTiles(scene);
 
       this.useSolidLayers();
    }
@@ -446,7 +408,7 @@ export class TiledMapResource implements Loadable<TiledMap> {
     * Creates the Excalibur tile map representation
     */
    private _createTileMap() {
-      const map = new TileMap(0, 0, this.data.rawMap.tilewidth, this.data.rawMap.tileheight, this.data.height, this.data.width);
+      let layerZIndexBase = this.layerZIndexStart;
 
       // register sprite sheets for each tileset in map
       for (const tileset of this.data.rawMap.tilesets) {
@@ -465,28 +427,30 @@ export class TiledMapResource implements Loadable<TiledMap> {
       }
 
       // Create Excalibur sprites for each cell
-      for (var layer of this.data.rawMap.layers) {
-         if (layer.type === "tilelayer") {
-            for (var i = 0; i < layer.data.length; i++) {
-               let gid = <number>layer.data[i];
-
+      for (var rawLayer of this.data.rawMap.layers) {
+         if (rawLayer.type === "tilelayer") {
+            const layer = new TileMap(0, 0, this.data.rawMap.tilewidth, this.data.rawMap.tileheight, this.data.height, this.data.width);
+            const zindex = getProperty<number>(rawLayer.properties, 'zindex')?.value || layerZIndexBase++;
+            layer.z = zindex;
+            for (var i = 0; i < rawLayer.data.length; i++) {
+               let gid = <number>rawLayer.data[i];
                if (gid !== 0) {
                   const sprite = this.getSpriteForGid(gid)
-                  map.data[i].addGraphic(sprite);
+                  layer.data[i].addGraphic(sprite);
                }
             }
+            this.layers?.push(layer);
          }
       }
-      this.map = map;
    }
 
    /**
-    * Return the TileMap for the parsed Tiled map
+    * Return the TileMap layers for the parsed Tiled map
     */
-   public getTileMap(): TileMap {
-      if (this.map) {
-         return this.map;
+   public getTileMapLayers(): TileMap[] {
+      if (this.layers?.length) {
+         return this.layers;
       }
-      throw new Error('Error loading tile map');
+      throw new Error('Error loading tile map layers');
    }
 }
