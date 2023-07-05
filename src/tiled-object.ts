@@ -64,7 +64,7 @@ export class TiledObjectGroup extends TiledEntity {
    }
 
    public getObjectsByClass(type: string): TiledObject[] {
-      return this.objects.filter(o => o.class?.toLocaleLowerCase() === type.toLocaleLowerCase());
+      return this.objects.filter(o => o.class?.toLocaleLowerCase() === type.toLocaleLowerCase() || o.type?.toLocaleLowerCase() === type.toLocaleLowerCase());
    }
 
    public getObjectByName(name: string): TiledObject | undefined {
