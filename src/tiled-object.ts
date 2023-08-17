@@ -26,6 +26,9 @@ export interface Ellipse {
    height: number;
 }
 
+/**
+ * Tiled Object Layer
+ */
 export class TiledObjectGroup extends TiledEntity {
    public objects: TiledObject[] = [];
 
@@ -71,7 +74,7 @@ export class TiledObjectGroup extends TiledEntity {
    }
 
    public getObjectsByName(name: string): TiledObject[] {
-      return this.objects.filter(o => o.name?.toLocaleLowerCase() === name.toLocaleLowerCase());
+      return this.objects.filter(o => o.name?.toString().toLocaleLowerCase() === name.toString().toLocaleLowerCase());
    }
 
    public getPoints(): TiledObject[] {

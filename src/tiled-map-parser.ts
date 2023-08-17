@@ -48,8 +48,15 @@ export class TiledMap {
     */
    objectGroups: TiledObjectGroup[] = [];
 
+   /**
+    * @deprecated Will be removed in v0.29.0
+    */
    public getExcaliburObjects(): TiledObjectGroup[] {
       return this.getObjectLayerByProperty('excalibur', true);
+   }
+
+   public getObjects(): TiledObjectGroup[] {
+      return this.objectGroups.filter(l => !l.getProperty('excalibur-exclude')?.value) ?? [];
    }
 
    public getObjectLayerByName(name: string): TiledObjectGroup {
@@ -115,13 +122,16 @@ export class TiledMap {
      let objectlayers = Array.isArray(rawMap.objectgroup) ? rawMap.objectgroup : [rawMap.objectgroup];
      for (let objectlayer of objectlayers) {
          objectlayer.type = objectlayer.type ?? 'objectgroup';
-         objectlayer.objects = Array.isArray(objectlayer.object) ? objectlayer.object : [objectlayer.object];
-         objectlayer.objects.forEach((o: any) => o.properties = o.properties?.property ?? []);
-         objectlayer.objects.forEach((o: any) => _convertToArray(o, 'properties'));
          objectlayer.properties = objectlayer.properties?.property ?? [];
-         
          _convertToArray(objectlayer, 'properties');
-         delete objectlayer.object;
+         if (objectlayer.object) {
+            objectlayer.objects = Array.isArray(objectlayer.object) ? objectlayer.object : [objectlayer.object];
+            objectlayer.objects.forEach((o: any) => o.properties = o.properties?.property ?? []);
+            objectlayer.objects.forEach((o: any) => _convertToArray(o, 'properties'));
+            delete objectlayer.object;
+         } else { 
+            continue;
+         }
 
          for (let object of objectlayer.objects) {
             if (object.text) {
