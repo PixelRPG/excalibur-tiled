@@ -33,7 +33,7 @@
       "start:no-open": "webpack-dev-server --config webpack.config.test.js",
       "start:ci-server": "webpack --config webpack.config.test.js && http-server ./example --port 8080",
       "watch": "webpack --progress --watch",
-      "build": "cross-env NODE_ENV=production webpack",
+      "_build": "cross-env NODE_ENV=production webpack",
       "test": "npm run test:unit",
       "test:watch": "karma start --single-run=false",
       "test:unit": "karma start",

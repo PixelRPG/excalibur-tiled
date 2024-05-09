@@ -1,8 +1,8 @@
 {
    "compilerOptions": {
-      "moduleResolution": "node",
+      "moduleResolution": "Bundler",
       "strict": true,
-      "target": "es2018",
+      "target": "ESNext",
       "lib": ["DOM", "DOM.Iterable", "ES2019.Array"],
       "declaration": true,
       "outDir": "./dist",
