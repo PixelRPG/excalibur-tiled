@@ -19,5 +19,5 @@ export * from './resource/tileset';
 
 
 // export deprecated
-import * as deprecated from './deprecated';
-export { deprecated as Deprecated };
+// import * as deprecated from './deprecated';
+// export { deprecated as Deprecated };
