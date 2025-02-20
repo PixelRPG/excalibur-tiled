@@ -1,15 +1,15 @@
 {
    "compilerOptions": {
       "moduleResolution": "Bundler",
-      "strict": true,
       "target": "ESNext",
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "strict": true,
       "lib": ["DOM", "DOM.Iterable", "ES2019.Array"],
       "declaration": true,
-      "outDir": "./dist",
       "sourceMap": true,
       "paths": {
-         "@excalibur-tiled": ["./src/"],
-         "@excalibur-tiled/deprecated": ["./src/deprecated"]
+         "@excalibur-tiled": ["./src/"]
       }
    },
    "include": ["example/**/*.ts", "./src/**/*.ts", "./test/unit/*.spec.ts", "files.d.ts"],

@@ -1,4 +1,4 @@
-import { Color, ParallaxComponent, TileMap, Vector, vec, GraphicsComponent, Logger, AnimationStrategy, TransformComponent, Tile as ExTile } from "excalibur";
+import { Color, ParallaxComponent, TileMap, Vector, vec, GraphicsComponent, Logger, AnimationStrategy, TransformComponent, Tile as ExTile, BodyComponent } from "excalibur";
 import { mapProps } from "./properties";
 import { TiledTileLayer, isCSV, isInfiniteLayer, needsDecoding } from "../parser/tiled-parser";
 import { Decoder } from "./decoder";
@@ -26,6 +26,13 @@ export interface TileInfo {
 
 export class TileLayer implements Layer {
    private logger = Logger.getInstance();
+   /**
+    * Numeric id given by Tiled
+    */
+   public readonly id: number;
+   /**
+    * Optional name given by a user in Tiled
+    */
    public readonly name: string;
    public readonly class?: string;
    /**
@@ -50,6 +57,11 @@ export class TileLayer implements Layer {
    tilemap!: TileMap;
 
    private _gidToTileInfo = new Map<number, TileInfo[]>();
+
+   /**
+    * Whether the tile layer is visible in the original map
+    */
+   public readonly visible: boolean;
 
    /**
     * Returns the excalibur tiles that match a tiled gid
@@ -126,8 +138,8 @@ export class TileLayer implements Layer {
          return null;
       }
       if (this.tilemap) {
-         const exTile = this.tilemap.getTile(x, y);
-         const tileIndex = this.tilemap.tiles.indexOf(exTile);
+         const exTile = this.tilemap.getTile(x, y)!;
+         const tileIndex = this.tilemap.tiles.indexOf(exTile!);
          const gid = getCanonicalGid(this.data[tileIndex]);
 
          if (gid <= 0) {
@@ -144,9 +156,11 @@ export class TileLayer implements Layer {
 
    constructor(public tiledTileLayer: TiledTileLayer, public resource: TiledResource, public readonly order: number) {
       this.name = tiledTileLayer.name;
+      this.id = tiledTileLayer.id;
       this.class = tiledTileLayer.class;
       this.width = tiledTileLayer.width;
       this.height = tiledTileLayer.height;
+      this.visible = !!tiledTileLayer.visible;
       mapProps(this, tiledTileLayer.properties);
    }
 
@@ -155,9 +169,9 @@ export class TileLayer implements Layer {
       let tileset = this.resource.getTilesetForTileGid(gid);
       let maybeTile = tileset.getTileByGid(gid);
       if (!tiles) {
-         tiles = [{exTile: tile, tiledTile: maybeTile}];
+         tiles = [{ exTile: tile, tiledTile: maybeTile }];
       } else {
-         tiles.push({exTile: tile, tiledTile: maybeTile});
+         tiles.push({ exTile: tile, tiledTile: maybeTile });
       }
       this._gidToTileInfo.set(gid, tiles);
       tile.data.set(ExcaliburTiledProperties.TileData.Tiled, maybeTile);
@@ -165,7 +179,12 @@ export class TileLayer implements Layer {
 
    private updateTile(tile: ExTile, gid: number, hasTint: boolean, tint: Color, isSolidLayer: boolean) {
       this._recordTileData(gid, tile);
-      if (this.resource.useExcaliburWiring && isSolidLayer) {
+      const maybeLayerConfig = this.resource.getLayerConfig(this.name) ||
+         this.resource.getLayerConfig(this.id);
+      if (maybeLayerConfig?.isSolid !== undefined) {
+         isSolidLayer = maybeLayerConfig.isSolid;
+      }
+      if (this.resource.useExcaliburWiring && isSolidLayer && this.visible) {
          tile.solid = true;
       }
 
@@ -186,6 +205,14 @@ export class TileLayer implements Layer {
       const colliders = tileset.getCollidersForGid(gid);
       for (let collider of colliders) {
          tile.addCollider(collider);
+      }
+      if (maybeLayerConfig?.useTileColliders && colliders.length > 0) {
+         if (this.visible) {
+            tile.solid = true;
+         }
+      }
+      if (maybeLayerConfig?.useTileCollidersWhenInvisible && colliders.length > 0) {
+         tile.solid = true;
       }
 
       let animation = headless ? null : tileset.getAnimationForGid(gid);
@@ -229,15 +256,17 @@ export class TileLayer implements Layer {
    }
 
    async load() {
+      const maybeLayerConfig = this.resource.getLayerConfig(this.name) ||
+         this.resource.getLayerConfig(this.id);
       const opacity = this.tiledTileLayer.opacity;
       const hasTint = !!this.tiledTileLayer.tintcolor;
       const tint = this.tiledTileLayer.tintcolor ? Color.fromHex(this.tiledTileLayer.tintcolor) : Color.Transparent;
       const isSolidLayer = !!this.properties.get(ExcaliburTiledProperties.Layer.Solid);
       const layer = this.tiledTileLayer;
       const pos = vec(layer.offsetx ?? 0, layer.offsety ?? 0);
-      if (needsDecoding(this.tiledTileLayer)) {
+      if (this.tiledTileLayer.data && needsDecoding(this.tiledTileLayer)) {
          this.data = await Decoder.decode(this.tiledTileLayer.data, this.tiledTileLayer.compression);
-      } else if (isCSV(this.tiledTileLayer)) {
+      } else if (this.tiledTileLayer.data && isCSV(this.tiledTileLayer)) {
          this.data = this.tiledTileLayer.data;
       }
 
@@ -254,6 +283,10 @@ export class TileLayer implements Layer {
             columns: layer.width,
             rows: layer.height
          });
+         if (maybeLayerConfig?.collisionGroup) {
+            const body = this.tilemap.get(BodyComponent);
+            body.group = maybeLayerConfig.collisionGroup;
+         }
       } else {
          this.tilemap = new TileMap({
             name: this.name,
@@ -263,6 +296,10 @@ export class TileLayer implements Layer {
             columns: layer.width,
             rows: layer.height,
          });
+         if (maybeLayerConfig?.collisionGroup) {
+            const body = this.tilemap.get(BodyComponent);
+            body.group = maybeLayerConfig.collisionGroup;
+         }
       }
 
       // Common tilemap props
@@ -277,7 +314,7 @@ export class TileLayer implements Layer {
       }
       const graphics = this.tilemap.get(GraphicsComponent);
       if (graphics) {
-         graphics.visible = this.tiledTileLayer.visible;
+         graphics.isVisible = this.tiledTileLayer.visible;
          graphics.opacity = opacity;
       }
       if (layer.parallaxx || layer.parallaxy) {
@@ -285,11 +322,19 @@ export class TileLayer implements Layer {
          this.tilemap.addComponent(new ParallaxComponent(factor));
       }
 
-      // Parse tilemap data infinit or not
+      // Parse tilemap data infinite or not
       if (this.resource.map.infinite && isInfiniteLayer(this.tiledTileLayer)) {
+         const tileLayer = this.tiledTileLayer;
          for (let chunk of this.tiledTileLayer.chunks) {
-            for (let i = 0; i < chunk.data.length; i++) {
-               const gid = chunk.data[i];
+            let chunkData: number[] = [];
+            if (needsDecoding(this.tiledTileLayer)) {
+               chunkData = await Decoder.decode(chunk.data as unknown as string, tileLayer.compression);
+            } else if (isCSV(this.tiledTileLayer)) {
+               chunkData = chunk.data as number[];
+            }
+
+            for (let i = 0; i < chunkData.length; i++) {
+               const gid = chunkData[i];
                if (gid != 0) {
                   // Map from chunk to big tile map
                   const tileX = (i % chunk.width) + (chunk.x - this.tiledTileLayer.startx);

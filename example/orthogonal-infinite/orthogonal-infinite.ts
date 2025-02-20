@@ -11,10 +11,10 @@ class Player extends ex.Actor {
       if (engine.input.keyboard.isHeld(ex.Keys.Left)) {
          this.vel.x = -speed;
       }
-      if (game.input.keyboard.isHeld(ex.Input.Keys.Up)) {
+      if (game.input.keyboard.isHeld(ex.Keys.Up)) {
          this.vel.y = -speed;
       }
-      if (game.input.keyboard.isHeld(ex.Input.Keys.Down)) {
+      if (game.input.keyboard.isHeld(ex.Keys.Down)) {
          this.vel.y = speed;
       }
    }
@@ -68,10 +68,10 @@ game.input.pointers.primary.on('down', (moveEvent) => {
 });
 
 game.input.pointers.primary.on('move', (moveEvent) => {
-   const tile = tiledMap.getTileByPoint('ground', moveEvent.worldPos);
-   if (tile) {
-      console.log(tile);
-   }
+   // const tile = tiledMap.getTileByPoint('ground', moveEvent.worldPos);
+   // if (tile) {
+   //    console.log(tile);
+   // }
 })
 
 game.input.pointers.primary.on('wheel', (wheelEvent) => {

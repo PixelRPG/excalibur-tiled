@@ -11,7 +11,7 @@ The plugin officially supports the latest version of Tiled that has been publish
 ## Installation
 
 ```sh
-npm install --save-exact @excaliburjs/plugin-tiled@next
+npm install --save-exact @excaliburjs/plugin-tiled
 ```
 
 Create your resource, load it, then add it to your scene!
@@ -66,7 +66,7 @@ To update snapshots
 * Linux for CI
 
    ```powershell
-   docker run --rm --network host -v C:\projects\excalibur-tiled:/work/ -w /work/ -it mcr.microsoft.com/playwright:v1.41.2-jammy /bin/bash
+   docker run --rm --network host -v ${PWD}:/work/ -w /work/ -it mcr.microsoft.com/playwright:v1.49.1-jammy /bin/bash
    npm install
    npx playwright test --update-snapshots
    ```
