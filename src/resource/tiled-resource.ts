@@ -499,7 +499,7 @@ export class TiledResource implements Loadable<any> {
             return entity;
          }
       }
-      return;
+      return undefined;
    }
 
    getObjectByEntity(actor: Entity): PluginObject | undefined {
@@ -509,7 +509,7 @@ export class TiledResource implements Loadable<any> {
             return object;
          }
       }
-      return;
+      return undefined;
    }
 
    /**

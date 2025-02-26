@@ -41,7 +41,7 @@ export class Tile implements Properties {
       }
 
       if (tiledTile.animation) {
-         this.animation = tiledTile.animation;
+         this.animation = tiledTile.animation as { tileid: number, duration: number }[];
       }
 
    }

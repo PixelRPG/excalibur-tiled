@@ -251,9 +251,9 @@ export function parseObject(object: TiledObject, resource?: TiledResource): Plug
          newObject = new Ellipse(object, 20, 20);
       }
    } else if (object.polygon) {
-      newObject = new Polygon(object, object.polygon);
+      newObject = new Polygon(object, object.polygon as { x: number; y: number; }[]);
    } else if (object.polyline) {
-      newObject = new Polyline(object, object.polyline);
+      newObject = new Polyline(object, object.polyline as { x: number; y: number; }[]);
    } else if (object.text) {
       newObject = new Text(object, object.text, object.width ?? 0, resource?.textQuality ?? 4);
    } else if (object.gid && !object.template) {
